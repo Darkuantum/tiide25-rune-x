@@ -15,24 +15,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Project Decypher - AI Semantic Archaeologist",
-  description: "Reviving Lost Languages Through Intelligent Design. AI-powered platform for ancient text decryption and translation.",
-  keywords: ["ancient languages", "AI translation", "cultural heritage", "glyph recognition", "archaeology", "linguistics"],
+  title: "Rune-X - AI Semantic Archaeologist",
+  description: "Interpreting the Past. Empowering the Future. Advanced multimodal AI platform for ancient script interpretation, reconstruction, and semantic analysis.",
+  keywords: ["ancient languages", "AI translation", "cultural heritage", "glyph recognition", "archaeology", "linguistics", "epigraphy", "ancient scripts", "heritage AI"],
   authors: [{ name: "Zhicong Technology" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
-    title: "Project Decypher",
-    description: "AI-powered ancient text decryption and translation",
-    url: "https://project-decypher.com",
-    siteName: "Project Decypher",
+    title: "Rune-X",
+    description: "Advanced multimodal AI platform for ancient script interpretation and reconstruction",
+    url: "https://rune-x.com",
+    siteName: "Rune-X",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Project Decypher",
-    description: "AI-powered ancient text decryption and translation",
+    title: "Rune-X",
+    description: "Advanced multimodal AI platform for ancient script interpretation and reconstruction",
   },
 };
 

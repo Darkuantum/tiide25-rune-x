@@ -31,13 +31,13 @@ export default function Home() {
   const { data: session, status } = useSession()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div id="top" className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Navigation */}
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Brain className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold">Project Decypher</span>
+            <span className="text-xl font-bold">Rune-X</span>
           </div>
           <div className="flex items-center space-x-4">
             <Button variant="ghost" asChild>
@@ -82,19 +82,19 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20">
+      <section className="container mx-auto px-4 py-14 md:py-16">
         <div className="max-w-4xl mx-auto text-center">
           <Badge className="mb-4" variant="secondary">
             <Sparkles className="w-3 h-3 mr-1" />
             AI-Powered Cultural Intelligence
           </Badge>
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            AI Semantic Archaeologist
+            Rune-X
           </h1>
           <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-            Reviving Lost Languages Through Intelligent Design. Our advanced AI system 
-            recognizes, interprets, and regenerates ancient texts and symbols, making 
-            humanity's written history accessible to all.
+            Interpreting the Past. Empowering the Future. Our advanced multimodal AI platform 
+            transforms digitised inscriptions into structured, machine-readable knowledge through 
+            glyph tokenisation, semantic inference, and generative reconstruction.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {session ? (
@@ -122,32 +122,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-primary/5">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div className="space-y-2">
-              <div className="text-3xl font-bold text-primary">70-80%</div>
-              <div className="text-sm text-muted-foreground">Accuracy Rate</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl font-bold text-primary">60 Days</div>
-              <div className="text-sm text-muted-foreground">Development Timeline</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl font-bold text-primary">$11.7B</div>
-              <div className="text-sm text-muted-foreground">Market by 2033</div>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl font-bold text-primary">10%</div>
-              <div className="text-sm text-muted-foreground">Currently Digitized</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Divider */}
+      <div className="border-t border-muted/40 mx-4" />
 
       {/* Features Section */}
-      <section id="features" className="py-20">
+      <section id="features" className="py-14 md:py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Core Features</h2>
@@ -363,7 +342,7 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Why Project Decypher?
+                Why Rune-X?
               </h2>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
@@ -405,8 +384,12 @@ export default function Home() {
               </div>
             </div>
             <div className="relative">
-              <div className="aspect-square bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl flex items-center justify-center">
-                <BarChart3 className="h-32 w-32 text-primary/30" />
+              <div className="aspect-square rounded-2xl overflow-hidden shadow-md border bg-muted/30">
+                <img
+                  src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80"
+                  alt="Ancient manuscript imagery"
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           </div>
@@ -429,8 +412,13 @@ export default function Home() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
-              Learn More
+            <Button
+              size="lg"
+              variant="secondary"
+              className="text-lg px-8 bg-white text-primary hover:bg-white/90"
+              asChild
+            >
+              <Link href="#top">Back to Top</Link>
             </Button>
           </div>
         </div>
@@ -442,10 +430,10 @@ export default function Home() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Brain className="h-6 w-6 text-primary" />
-              <span className="font-semibold">Project Decypher</span>
+              <span className="font-semibold">Rune-X</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2025 Zhicong Technology. Reviving lost languages through intelligent design.
+              © 2025 Zhicong Technology. Interpreting the past. Empowering the future.
             </div>
           </div>
         </div>

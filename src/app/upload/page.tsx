@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -18,9 +18,13 @@ import {
   ArrowLeft,
   Download,
   Share,
-  History
+  History,
+  Cpu,
+  Network,
+  Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
+import ResultsDisplay from './ResultsDisplay'
 
 interface UploadedFile {
   file: File
@@ -30,16 +34,23 @@ interface UploadedFile {
 
 interface ProcessingResult {
   id: string
+  uploadId?: string // Store the actual upload ID for exports
   status: 'processing' | 'completed' | 'failed'
   progress: number
+  currentStage?: 'tokenization' | 'semantic' | 'reconstruction' | 'complete'
+  extractedText?: string
   glyphs?: Array<{
     symbol: string
     confidence: number
     position: { x: number; y: number; width: number; height: number }
     meaning?: string
+    isReconstructed?: boolean
   }>
   translation?: string
   confidence?: number
+  scriptType?: string
+  method?: string
+  error?: string // Error message if processing failed
 }
 
 export default function UploadPage() {
@@ -48,12 +59,76 @@ export default function UploadPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [processingResults, setProcessingResults] = useState<ProcessingResult[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [activeTab, setActiveTab] = useState('upload')
+  const [savedResults, setSavedResults] = useState<ProcessingResult[]>([]) // Results from database
+
+  // Load saved results from the database
+  const loadSavedResults = useCallback(async () => {
+    try {
+      const response = await fetch('/api/translations?filter=all')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.translations) {
+          // Convert translations to ProcessingResult format
+          const results: ProcessingResult[] = data.translations.map((t: any) => ({
+            id: t.upload?.id || t.id,
+            uploadId: t.upload?.id || t.id,
+            status: 'completed' as const,
+            progress: 100,
+            extractedText: t.originalText,
+            translation: t.translatedText,
+            confidence: t.confidence,
+            scriptType: t.upload?.scriptType || 'Unknown',
+            method: 'saved',
+            originalName: t.upload?.originalName,
+            imageUrl: t.upload?.imageUrl || (t.upload?.id ? `/api/uploads/${t.upload.id}` : undefined),
+            glyphs: (t.glyphs || []).map((g: any) => {
+              // Use stored confidence, or default to 60% if character is recognized but no meaning
+              const hasValidMeaning = g.meaning && 
+                                     !g.meaning.includes('Unknown character') && 
+                                     !g.meaning.includes('not available') &&
+                                     !g.meaning.includes('Character recognized but meaning not available')
+              return {
+                symbol: g.symbol,
+                confidence: g.confidence !== undefined ? g.confidence : (hasValidMeaning ? 0.75 : 0.60),
+                position: { x: 0, y: 0, width: 50, height: 50 }, // Default position if not available
+                meaning: g.meaning || (g.symbol ? `Character recognized but meaning not available` : 'Unknown'),
+                isReconstructed: false
+              }
+            })
+          }))
+          setSavedResults(results)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load saved results:', error)
+    }
+  }, [])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/auth/login?callbackUrl=/upload')
+    } else if (status === 'authenticated') {
+      // Load saved results from database when component mounts
+      loadSavedResults()
     }
-  }, [status, router])
+  }, [status, router, loadSavedResults])
+
+  // Error boundary for JSON parsing errors
+  useEffect(() => {
+    const originalError = console.error
+    console.error = (...args) => {
+      if (args[0]?.message?.includes('JSON') || args[0]?.message?.includes('Unexpected end')) {
+        console.warn('JSON parsing error caught and handled:', args[0])
+        return // Suppress the error from crashing the page
+      }
+      originalError(...args)
+    }
+    
+    return () => {
+      console.error = originalError
+    }
+  }, [])
 
   if (status === 'loading') {
     return (
@@ -96,12 +171,14 @@ export default function UploadPage() {
     if (uploadedFiles.length === 0) return
 
     setIsProcessing(true)
+    setActiveTab('processing') // Switch to processing tab
     
     // Initialize processing results
     const results: ProcessingResult[] = uploadedFiles.map(file => ({
       id: file.id,
       status: 'processing' as const,
-      progress: 0
+      progress: 0,
+      currentStage: 'tokenization' as const
     }))
 
     setProcessingResults(results)
@@ -115,16 +192,135 @@ export default function UploadPage() {
         const formData = new FormData()
         formData.append('file', file.file)
         
+        // Note: Metadata fields can be added here in the future
+        // formData.append('provenance', '...')
+        // formData.append('imagingMethod', 'photography')
+        // formData.append('scriptType', 'Traditional Chinese')
+        
         const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: formData
         })
         
         if (!uploadResponse.ok) {
-          throw new Error('Upload failed')
+          // Extract error message from API response
+          let errorMessage = 'Upload failed'
+          let errorDetails = ''
+          try {
+            const errorText = await uploadResponse.text()
+            if (errorText && errorText.trim() !== '') {
+              try {
+                const errorData = JSON.parse(errorText)
+                errorMessage = errorData.error || errorData.message || 'Upload failed'
+                errorDetails = errorData.details || errorData.error || ''
+              } catch {
+                errorMessage = errorText
+                errorDetails = errorText
+              }
+            }
+          } catch {
+            errorMessage = 'Failed to upload file'
+            errorDetails = 'Unknown error occurred'
+          }
+          
+          // Mark this specific file as failed with error message
+          setProcessingResults(prev => 
+            prev.map(r => 
+              r.id === file.id 
+                ? {
+                    ...r,
+                    status: 'failed',
+                    progress: 0,
+                    error: errorDetails || errorMessage
+                  }
+                : r
+            )
+          )
+          
+          console.error(`Upload failed for ${file.file.name}:`, errorDetails || errorMessage)
+          continue
         }
         
-        const uploadData = await uploadResponse.json()
+        let uploadData
+        try {
+          const uploadText = await uploadResponse.text()
+          if (!uploadText || uploadText.trim() === '') {
+            // Mark as failed
+            setProcessingResults(prev => 
+              prev.map(r => 
+                r.id === file.id 
+                  ? {
+                      ...r,
+                      status: 'failed',
+                      progress: 0,
+                      error: 'Empty response from upload API'
+                    }
+                  : r
+              )
+            )
+            continue
+          }
+          uploadData = JSON.parse(uploadText)
+        } catch (parseError: any) {
+          console.error('Failed to parse upload response:', parseError)
+          // Mark as failed
+          setProcessingResults(prev => 
+            prev.map(r => 
+              r.id === file.id 
+                ? {
+                    ...r,
+                    status: 'failed',
+                    progress: 0,
+                    error: `Failed to parse upload response: ${parseError.message || 'Unknown parsing error'}`
+                  }
+                : r
+            )
+          )
+          continue
+        }
+        
+        if (!uploadData.uploadId) {
+          // Mark as failed
+          setProcessingResults(prev => 
+            prev.map(r => 
+              r.id === file.id 
+                ? {
+                    ...r,
+                    status: 'failed',
+                    progress: 0,
+                    error: 'Upload response missing uploadId'
+                  }
+                : r
+            )
+          )
+          continue
+        }
+        
+        // Update to tokenization stage (OCR extraction)
+        setProcessingResults(prev => 
+          prev.map(r => 
+            r.id === file.id 
+              ? {
+                  ...r,
+                  currentStage: 'tokenization',
+                  progress: 10
+                }
+              : r
+          )
+        )
+        
+        // Update progress for tokenization
+        setProcessingResults(prev => 
+          prev.map(r => 
+            r.id === file.id 
+              ? {
+                  ...r,
+                  currentStage: 'tokenization',
+                  progress: 30
+                }
+              : r
+          )
+        )
         
         // Step 2: Process the uploaded file
         const processResponse = await fetch('/api/process', {
@@ -135,49 +331,231 @@ export default function UploadPage() {
           body: JSON.stringify({ uploadId: uploadData.uploadId })
         })
         
-        if (!processResponse.ok) {
-          throw new Error('Processing failed')
-        }
-        
-        const processData = await processResponse.json()
-        
-        // Step 3: Get detailed results
-        const resultsResponse = await fetch(`/api/process?uploadId=${uploadData.uploadId}`)
-        const resultsData = await resultsResponse.json()
-        
-        // Update progress to complete
+        // Update to semantic transformer stage (matching & translation)
         setProcessingResults(prev => 
           prev.map(r => 
             r.id === file.id 
               ? {
                   ...r,
-                  status: 'completed',
-                  progress: 100,
-                  glyphs: resultsData.upload?.glyphs?.map((g: any) => ({
-                    symbol: g.glyph.symbol,
-                    confidence: g.confidence,
-                    position: JSON.parse(g.boundingBox || '{}'),
-                    meaning: g.glyph.description
-                  })) || [],
-                  translation: resultsData.upload?.translations?.[0]?.translatedText || '',
-                  confidence: resultsData.upload?.translations?.[0]?.confidence || 0.90
+                  currentStage: 'semantic',
+                  progress: 50
                 }
               : r
           )
         )
+        
+        if (!processResponse.ok) {
+          // Extract detailed error message from API response
+          let errorMessage = 'Processing failed'
+          let errorDetails = ''
+          try {
+            const errorText = await processResponse.text()
+            if (errorText && errorText.trim() !== '') {
+              try {
+                const errorData = JSON.parse(errorText)
+                errorMessage = errorData.error || errorData.message || 'Processing failed'
+                errorDetails = errorData.details || errorData.error || ''
+              } catch {
+                errorMessage = errorText
+                errorDetails = errorText
+              }
+            }
+          } catch {
+            errorMessage = 'Failed to process image'
+            errorDetails = 'Unknown error occurred'
+          }
+          
+          // Mark this specific file as failed with error message
+          setProcessingResults(prev => 
+            prev.map(r => 
+              r.id === file.id 
+                ? {
+                    ...r,
+                    status: 'failed',
+                    progress: 0,
+                    error: errorDetails || errorMessage
+                  }
+                : r
+            )
+          )
+          
+          // Continue to next file instead of throwing
+          console.error(`Processing failed for ${file.file.name}:`, errorDetails || errorMessage)
+          continue
+        }
+        
+        let processData
+        try {
+          const processText = await processResponse.text()
+          if (!processText || processText.trim() === '') {
+            console.warn('Empty response from process API')
+            processData = { success: false, results: null }
+          } else {
+            processData = JSON.parse(processText)
+          }
+        } catch (parseError) {
+          console.error('Failed to parse process response:', parseError)
+          // Mark this file as failed
+          setProcessingResults(prev => 
+            prev.map(r => 
+              r.id === file.id 
+                ? {
+                    ...r,
+                    status: 'failed',
+                    progress: 0,
+                    error: `Failed to parse processing response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`
+                  }
+                : r
+            )
+          )
+          continue
+        }
+        
+        // Update progress for semantic processing
+        setProcessingResults(prev => 
+          prev.map(r => 
+            r.id === file.id 
+              ? {
+                  ...r,
+                  currentStage: 'semantic',
+                  progress: 70
+                }
+              : r
+          )
+        )
+        
+        // Step 3: Get detailed results
+        const resultsResponse = await fetch(`/api/process?uploadId=${uploadData.uploadId}`)
+        if (!resultsResponse.ok) {
+          // If results fetch fails, we still have processData, so log but continue
+          console.warn(`Failed to fetch detailed results for ${file.file.name}, using process response data`)
+        }
+        
+        // Update to reconstruction stage (if needed) or complete
+        setProcessingResults(prev => 
+          prev.map(r => 
+            r.id === file.id 
+              ? {
+                  ...r,
+                  currentStage: 'reconstruction',
+                  progress: 85
+                }
+              : r
+          )
+        )
+        
+        let resultsData
+        try {
+          const text = await resultsResponse.ok ? await resultsResponse.text() : ''
+          if (!text || text.trim() === '') {
+            console.warn('Empty response from results API')
+            resultsData = { upload: null }
+          } else {
+            resultsData = JSON.parse(text)
+          }
+        } catch (parseError) {
+          console.error('Failed to parse results response:', parseError)
+          // Use processData as fallback - don't mark as failed since we have processData
+          resultsData = { upload: null }
+        }
+        
+        // Update progress to complete
+        setProcessingResults(prev => {
+          const updated = prev.map(r => 
+            r.id === file.id 
+              ? {
+                  ...r,
+                  uploadId: uploadData.uploadId, // Store uploadId for exports
+                  status: 'completed',
+                  progress: 100,
+                  currentStage: 'complete',
+                  imageUrl: `/api/uploads/${uploadData.uploadId}`, // Add image URL
+                  glyphs: (() => {
+                    // Try to get glyphs from resultsData first, then fallback to processData
+                    if (resultsData.upload?.glyphs && resultsData.upload.glyphs.length > 0) {
+                      return resultsData.upload.glyphs.map((g: any) => {
+                        // Safely parse boundingBox
+                        let position = { x: 0, y: 0, width: 0, height: 0 }
+                        try {
+                          if (g.boundingBox && typeof g.boundingBox === 'string' && g.boundingBox.trim() !== '') {
+                            position = JSON.parse(g.boundingBox)
+                          }
+                        } catch (e) {
+                          console.warn('Failed to parse boundingBox:', e)
+                        }
+                        const meaning = g.glyph?.description || g.glyph?.name || ''
+                        const hasValidMeaning = meaning && 
+                                               !meaning.includes('Unknown character') && 
+                                               !meaning.includes('Character:') &&
+                                               !meaning.includes('not available')
+                        return {
+                          symbol: g.glyph?.symbol || '',
+                          confidence: g.confidence !== undefined ? g.confidence : (hasValidMeaning ? 0.75 : 0.60),
+                          position,
+                          meaning: meaning || (g.glyph?.symbol ? `Character recognized but meaning not available` : 'Unknown')
+                        }
+                      })
+                    }
+                    // Fallback to processData results
+                    if (processData.results?.glyphs && processData.results.glyphs.length > 0) {
+                      return processData.results.glyphs.map((g: any) => ({
+                        symbol: g.symbol || '',
+                        confidence: g.confidence || 0,
+                        position: { x: 0, y: 0, width: 50, height: 50 },
+                        meaning: g.meaning || (g.symbol ? `Unknown character (may need to be added to database)` : 'Unknown')
+                      }))
+                    }
+                    return []
+                  })(),
+                  extractedText: resultsData.upload?.translations?.[0]?.originalText || 
+                                processData.results?.extractedText || 
+                                '',
+                  translation: resultsData.upload?.translations?.[0]?.translatedText || 
+                              processData.results?.translation || 
+                              'Translation not available',
+                  confidence: resultsData.upload?.translations?.[0]?.confidence || 
+                             processData.results?.confidence || 
+                             0.90,
+                  scriptType: processData.results?.scriptType || 'Unknown',
+                  method: processData.results?.method || 'unknown'
+                }
+              : r
+          )
+          
+          // Switch to results tab when we have completed results
+          const hasCompleted = updated.some(r => r.status === 'completed')
+          if (hasCompleted) {
+            // Use setTimeout to ensure state is updated first
+            setTimeout(() => {
+              setActiveTab('results')
+            }, 100)
+          }
+          
+          return updated
+        })
       }
-    } catch (error) {
-      console.error('Processing error:', error)
-      // Mark all as failed
+    } catch (error: any) {
+      // This catch should rarely be hit now since we handle errors per-file
+      // But if there's an unexpected error, log it and mark remaining files as failed
+      console.error('Unexpected processing error:', error)
+      const errorMessage = error?.message || error?.toString() || 'An unexpected error occurred'
+      
+      // Only mark files that are still processing as failed
       setProcessingResults(prev => 
-        prev.map(r => ({
-          ...r,
-          status: 'failed',
-          progress: 0
-        }))
+        prev.map(r => 
+          r.status === 'processing'
+            ? {
+                ...r,
+                status: 'failed',
+                progress: 0,
+                error: errorMessage
+              }
+            : r
+        )
       )
     } finally {
       setIsProcessing(false)
+      // Tab switching is now handled inside the state update
     }
   }
 
@@ -195,13 +573,15 @@ export default function UploadPage() {
             </Button>
             <div className="flex items-center space-x-2">
               <Brain className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold">Project Decypher</span>
+              <span className="text-lg font-semibold">Rune-X</span>
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              <History className="mr-2 h-4 w-4" />
-              History
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/translations">
+                <History className="mr-2 h-4 w-4" />
+                History
+              </Link>
             </Button>
           </div>
         </div>
@@ -220,7 +600,7 @@ export default function UploadPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="upload" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="upload">Upload Files</TabsTrigger>
               <TabsTrigger value="processing">Processing</TabsTrigger>
@@ -392,12 +772,42 @@ export default function UploadPage() {
                                 )}
                                 <div>
                                   <p className="font-medium">{file?.file.name}</p>
-                                  <Badge variant={
-                                    result.status === 'completed' ? 'default' :
-                                    result.status === 'processing' ? 'secondary' : 'destructive'
-                                  }>
-                                    {result.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant={
+                                      result.status === 'completed' ? 'default' :
+                                      result.status === 'processing' ? 'secondary' : 'destructive'
+                                    }>
+                                      {result.status}
+                                    </Badge>
+                                    {result.status === 'processing' && result.currentStage && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        {result.currentStage === 'tokenization' && (
+                                          <>
+                                            <Cpu className="h-3.5 w-3.5 text-primary animate-pulse" />
+                                            <span>Glyph Tokenization</span>
+                                          </>
+                                        )}
+                                        {result.currentStage === 'semantic' && (
+                                          <>
+                                            <Network className="h-3.5 w-3.5 text-primary animate-pulse" />
+                                            <span>Semantic Transformer</span>
+                                          </>
+                                        )}
+                                        {result.currentStage === 'reconstruction' && (
+                                          <>
+                                            <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                                            <span>Generative Reconstruction</span>
+                                          </>
+                                        )}
+                                        {result.currentStage === 'complete' && (
+                                          <>
+                                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                            <span>Complete</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <span className="text-sm text-muted-foreground">
@@ -415,86 +825,12 @@ export default function UploadPage() {
             </TabsContent>
 
             <TabsContent value="results" className="mt-8">
-              <div className="space-y-8">
-                {processingResults
-                  .filter(result => result.status === 'completed')
-                  .map((result) => {
-                    const file = uploadedFiles.find(f => f.id === result.id)
-                    return (
-                      <Card key={result.id}>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                              <CheckCircle className="h-5 w-5 text-green-500" />
-                              Analysis Results
-                            </CardTitle>
-                            <div className="flex items-center space-x-2">
-                              <Button variant="outline" size="sm">
-                                <Download className="mr-2 h-4 w-4" />
-                                Export
-                              </Button>
-                              <Button variant="outline" size="sm">
-                                <Share className="mr-2 h-4 w-4" />
-                                Share
-                              </Button>
-                            </div>
-                          </div>
-                          <CardDescription>
-                            {file?.file.name} • Confidence: {(result.confidence! * 100).toFixed(1)}%
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          {/* Original Image */}
-                          <div>
-                            <h4 className="font-medium mb-3">Original Image</h4>
-                            {file && (
-                              <img
-                                src={file.preview}
-                                alt={file.file.name}
-                                className="w-full max-w-md mx-auto rounded-lg border"
-                              />
-                            )}
-                          </div>
-
-                          {/* Detected Glyphs */}
-                          <div>
-                            <h4 className="font-medium mb-3">Detected Glyphs</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {result.glyphs?.map((glyph, index) => (
-                                <div key={index} className="text-center p-4 border rounded-lg">
-                                  <div className="text-2xl mb-2">{glyph.symbol}</div>
-                                  <div className="text-sm font-medium">{glyph.meaning}</div>
-                                  <div className="text-xs text-green-600">
-                                    {(glyph.confidence * 100).toFixed(1)}% match
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Translation */}
-                          <div>
-                            <h4 className="font-medium mb-3">Translation & Context</h4>
-                            <div className="bg-primary/10 p-4 rounded-lg">
-                              <p className="font-medium mb-2">{result.translation}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-                
-                {processingResults.filter(result => result.status === 'completed').length === 0 && (
-                  <Card>
-                    <CardContent className="text-center py-12">
-                      <Eye className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-                      <p className="text-muted-foreground">
-                        No completed results yet. Upload and process some files to see results here.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+              <ResultsDisplay 
+                processingResults={processingResults}
+                savedResults={savedResults}
+                uploadedFiles={uploadedFiles}
+                onLoadSaved={loadSavedResults}
+              />
             </TabsContent>
           </Tabs>
         </div>

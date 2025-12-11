@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-// Mock ancient glyph data for simulation
-const mockGlyphs = [
-  { symbol: '道', meaning: 'Tao - The way/path', confidence: 0.95 },
-  { symbol: '法', meaning: 'Fa - Law/method', confidence: 0.88 },
-  { symbol: '自', meaning: 'Zi - Self/natural', confidence: 0.92 },
-  { symbol: '然', meaning: 'Ran - Thus/naturally', confidence: 0.85 },
-  { symbol: '人', meaning: 'Ren - Person/human', confidence: 0.90 },
-  { symbol: '天', meaning: 'Tian - Heaven/sky', confidence: 0.93 },
-  { symbol: '地', meaning: 'Di - Earth/ground', confidence: 0.87 },
-  { symbol: '德', meaning: 'De - Virtue/morality', confidence: 0.89 }
-]
-
-const mockTranslations = {
-  '道法自然': 'The Tao follows nature - A fundamental concept in Taoist philosophy suggesting that the natural way of things is the best way.',
-  '天人合一': 'Heaven and humanity are one - The unity between the cosmos and human existence.',
-  '道德经': 'Tao Te Ching - The fundamental text of Taoism attributed to Laozi.',
-  '仁义礼智': 'Benevolence, righteousness, propriety, and wisdom - The four cardinal virtues in Confucianism.'
-}
+import { processAncientText, generateTranslation } from '@/lib/ai-processor'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,86 +10,151 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Upload ID is required' }, { status: 400 })
     }
 
+    // Get upload record to find file path
+    const upload = await db.upload.findUnique({
+      where: { id: uploadId }
+    })
+
+    if (!upload) {
+      return NextResponse.json({ error: 'Upload not found' }, { status: 404 })
+    }
+
     // Update upload status to processing
     await db.upload.update({
       where: { id: uploadId },
       data: { status: 'PROCESSING' }
     })
 
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Clean up any previous AI results for this upload to avoid duplicates
+    await db.glyphMatch.deleteMany({ where: { uploadId } })
+    await db.translation.deleteMany({ where: { uploadId } })
 
-    // Generate mock glyph matches
-    const numGlyphs = Math.floor(Math.random() * 4) + 2 // 2-5 glyphs
-    const selectedGlyphs = mockGlyphs.sort(() => 0.5 - Math.random()).slice(0, numGlyphs)
-    
-    // Create glyph matches
-    for (let i = 0; i < selectedGlyphs.length; i++) {
-      const glyph = selectedGlyphs[i]
+    // Process the image using AI
+    let processingResult
+    try {
+      processingResult = await processAncientText(upload.filePath, db)
+    } catch (error: any) {
+      console.error('AI processing error:', error)
       
-      // Find or create the glyph in database
-      let glyphRecord = await db.glyph.findFirst({
-        where: { symbol: glyph.symbol }
+      // Update upload status to failed
+      await db.upload.update({
+        where: { id: uploadId },
+        data: { status: 'FAILED' }
       })
 
-      if (!glyphRecord) {
-        // Create a mock ancient script record
-        let scriptRecord = await db.ancientScript.findFirst({
-          where: { name: 'Traditional Chinese' }
-        })
+      return NextResponse.json(
+        { 
+          error: 'Failed to process image with AI',
+          details: error.message || 'OCR extraction failed. Please ensure the image is clear and contains readable text.'
+        },
+        { status: 500 }
+      )
+    }
 
-        if (!scriptRecord) {
-          scriptRecord = await db.ancientScript.create({
-            data: {
-              name: 'Traditional Chinese',
-              description: 'Traditional Chinese characters used in ancient texts',
-              region: 'China',
-              timePeriod: '2000 BCE - Present'
-            }
-          })
-        }
+    // Get or create script record
+    let scriptRecord = await db.ancientScript.findFirst({
+      where: { name: processingResult.scriptType || 'Traditional Chinese' }
+    })
 
-        glyphRecord = await db.glyph.create({
-          data: {
-            scriptId: scriptRecord.id,
-            symbol: glyph.symbol,
-            name: glyph.symbol,
-            description: glyph.meaning,
-            confidence: glyph.confidence
-          }
-        })
-      }
-
-      // Create glyph match
-      await db.glyphMatch.create({
+    if (!scriptRecord) {
+      scriptRecord = await db.ancientScript.create({
         data: {
-          uploadId,
-          glyphId: glyphRecord.id,
-          confidence: glyph.confidence,
-          boundingBox: JSON.stringify({
-            x: i * 60 + 10,
-            y: 20,
-            width: 50,
-            height: 50
-          }),
-          position: i
+          name: processingResult.scriptType || 'Traditional Chinese',
+          description: `Detected script type: ${processingResult.scriptType}`,
+          region: 'Unknown',
+          timePeriod: 'Unknown'
         }
       })
     }
 
-    // Generate mock translation
-    const originalText = selectedGlyphs.map(g => g.symbol).join('')
-    const translation = mockTranslations[originalText as keyof typeof mockTranslations] || 
-      `Translation of "${originalText}" - This ancient text contains profound wisdom about life, nature, and spiritual cultivation.`
+    // Create glyph records and matches
+    const createdGlyphMatches = []
+    for (const glyphMatch of processingResult.glyphs) {
+      // Find or create glyph in database
+      let glyphRecord = await db.glyph.findFirst({
+        where: { 
+          symbol: glyphMatch.symbol,
+          scriptId: scriptRecord.id
+        }
+      })
 
-    // Create translation record
-    await db.translation.create({
+      if (!glyphRecord) {
+        // Create new glyph with the meaning from AI matching
+        // Only store if we have a real meaning (not fallback)
+        const description = (glyphMatch.meaning && 
+                            !glyphMatch.meaning.includes('Character:') && 
+                            !glyphMatch.meaning.includes('Unknown character') &&
+                            !glyphMatch.meaning.includes('not available'))
+          ? glyphMatch.meaning
+          : null // Don't store placeholder meanings
+        
+        glyphRecord = await db.glyph.create({
+          data: {
+            scriptId: scriptRecord.id,
+            symbol: glyphMatch.symbol,
+            name: glyphMatch.symbol,
+            description: description || `Character: ${glyphMatch.symbol}`, // Fallback only for DB constraint
+            confidence: glyphMatch.confidence
+          }
+        })
+      } else {
+        // Update existing glyph if we have a better meaning
+        // Update if: new meaning exists, is not a placeholder, and is better than current
+        const hasValidMeaning = glyphMatch.meaning && 
+                                !glyphMatch.meaning.includes('Unknown character') && 
+                                !glyphMatch.meaning.includes('not available') &&
+                                !glyphMatch.meaning.includes('Character:')
+        
+        const currentIsPlaceholder = !glyphRecord.description || 
+                                      glyphRecord.description.includes('Character:') ||
+                                      glyphRecord.description.includes('Unknown')
+        
+        if (hasValidMeaning && currentIsPlaceholder) {
+          await db.glyph.update({
+            where: { id: glyphRecord.id },
+            data: {
+              description: glyphMatch.meaning,
+              confidence: Math.max(glyphRecord.confidence || 0, glyphMatch.confidence)
+            }
+          })
+          glyphRecord.description = glyphMatch.meaning
+        }
+      }
+
+      // Create glyph match
+      const match = await db.glyphMatch.create({
+        data: {
+          uploadId,
+          glyphId: glyphRecord.id,
+          confidence: glyphMatch.confidence,
+          boundingBox: glyphMatch.boundingBox 
+            ? JSON.stringify(glyphMatch.boundingBox)
+            : null,
+          position: glyphMatch.position
+        }
+      })
+
+      createdGlyphMatches.push({
+        ...match,
+        glyph: glyphRecord
+      })
+    }
+
+    // Generate translation using AI
+    const translationResult = await generateTranslation(
+      processingResult.extractedText,
+      processingResult.glyphs
+    )
+
+    // Create translation record (single translation per upload)
+    const translation = await db.translation.create({
       data: {
         uploadId,
-        originalText,
-        translatedText: translation,
-        confidence: 0.85 + Math.random() * 0.1, // 85-95% confidence
-        language: 'English'
+        originalText: processingResult.extractedText,
+        translatedText: translationResult.translation,
+        confidence: translationResult.confidence,
+        language: 'English',
+        context: `Processed using ${processingResult.method} method. Script type: ${processingResult.scriptType}`
       }
     })
 
@@ -122,20 +169,28 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Processing completed successfully',
+      message: 'AI processing completed successfully',
       results: {
-        glyphs: selectedGlyphs,
-        translation,
-        confidence: 0.90
+        extractedText: processingResult.extractedText,
+        glyphs: processingResult.glyphs.map(g => ({
+          symbol: g.symbol,
+          meaning: g.meaning,
+          confidence: g.confidence
+        })),
+        translation: translation.translatedText,
+        confidence: translation.confidence,
+        scriptType: processingResult.scriptType,
+        method: processingResult.method
       }
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Processing error:', error)
     
     // Update upload status to failed
     try {
-      const { uploadId } = await request.json()
+      const body = await request.json().catch(() => ({}))
+      const uploadId = body.uploadId
       if (uploadId) {
         await db.upload.update({
           where: { id: uploadId },
@@ -147,7 +202,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to process image' },
+      { 
+        error: 'Failed to process image',
+        details: error.message || 'An unexpected error occurred during processing'
+      },
       { status: 500 }
     )
   }

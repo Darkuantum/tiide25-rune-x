@@ -36,9 +36,17 @@ model Upload {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
+  // Enhanced metadata for Rune-X
+  provenance    String?  // Provenance information (excavation ID, catalogue number, etc.)
+  imagingMethod String?  // Imaging modality (photography, CT, multispectral, etc.)
+  metadata      String?  // JSON metadata for additional context
+  scriptType    String?  // Detected or specified script type
+  
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   glyphs        GlyphMatch[]
   translations  Translation[]
+  versions      ReconstructionVersion[]
+  exports       Export[]
 }
 
 model AncientScript {
@@ -79,6 +87,11 @@ model GlyphMatch {
   boundingBox   String?  // JSON: {x, y, width, height}
   position      Int?     // Position in the text
   createdAt     DateTime @default(now())
+  
+  // Enhanced GTE features
+  strokeCount   Int?     // Detected stroke count
+  contourComplexity Float? // Contour complexity metric
+  isReconstructed Boolean @default(false) // Whether this glyph was reconstructed by GRM
   
   upload        Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
   glyph         Glyph  @relation(fields: [glyphId], references: [id])
@@ -134,4 +147,38 @@ enum FeedbackType {
   GLYPH_RECOGNITION
   UI_EXPERIENCE
   GENERAL
+}
+
+// New models for Rune-X features
+
+model ReconstructionVersion {
+  id            String   @id @default(cuid())
+  uploadId      String
+  versionNumber Int      // Version number for this reconstruction
+  reconstructedGlyphs String? // JSON array of reconstructed glyph data
+  confidence    Float    // Overall confidence for this reconstruction
+  method        String?  // Reconstruction method used (GRM variant)
+  createdAt     DateTime @default(now())
+  
+  upload        Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  
+  @@unique([uploadId, versionNumber])
+}
+
+model Export {
+  id            String   @id @default(cuid())
+  uploadId      String
+  format        ExportFormat
+  filePath      String?  // Path to exported file
+  exportedAt    DateTime @default(now())
+  
+  upload        Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+}
+
+enum ExportFormat {
+  TEI_XML
+  JSON_LD
+  CSV
+  PDF
+  IMAGE
 }

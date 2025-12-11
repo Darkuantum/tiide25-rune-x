@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,10 +65,19 @@ export default function RegisterPage() {
         return
       }
 
-      setSuccess(true)
-      setTimeout(() => {
-        router.push('/auth/login')
-      }, 2000)
+      // Auto login
+      const signinResp = await signIn('credentials', {
+        redirect: false,
+        email: data.email,
+        password: data.password
+      })
+
+      if (signinResp && signinResp.ok) {
+        setSuccess(true)
+        router.push('/upload')
+      } else {
+        setError('Account created but auto-login failed. Please sign in manually.')
+      }
     } catch (err) {
       setError('An error occurred. Please try again.')
     } finally {

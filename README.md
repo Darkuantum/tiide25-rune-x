@@ -1,12 +1,22 @@
-# 🚀 Project Decypher
+# 🚀 Rune-X
 
-**Reviving Lost Languages Through Intelligent Design**
+**Interpreting the Past. Empowering the Future.**
 
-An AI-powered SaaS platform for ancient text decryption and translation. Built with Next.js, TypeScript, and modern web technologies.
+An advanced multimodal AI platform for ancient script interpretation, reconstruction, and semantic analysis. Built with Next.js, TypeScript, and modern web technologies.
+
+## ✨ Overview
+
+Rune-X is a production-grade, multimodal artificial intelligence platform designed to automate the interpretation of ancient scripts and inscriptions. It addresses the critical gap between digitised heritage content and the ability to interpret, annotate, and make this content usable.
+
+### Core Architecture
+
+Rune-X integrates three technically robust components:
+
+1. **Glyph Tokenisation Engine (GTE)** - Isolates and represents individual glyphs from irregular or damaged inscriptions
+2. **Semantic Transformer Model (STM)** - Infers phonetic, semantic, or structural meaning from visual and contextual cues
+3. **Generative Reconstruction Module (GRM)** - Restores damaged glyphs using evidence-driven synthesis techniques
 
 ## ✨ Technology Stack
-
-This scaffold provides a robust foundation built with:
 
 ### 🎯 Core Framework
 - **⚡ Next.js 15** - The React framework for production with App Router
@@ -42,19 +52,6 @@ This scaffold provides a robust foundation built with:
 - **🌍 Next Intl** - Internationalization library for Next.js
 - **📅 Date-fns** - Modern JavaScript date utility library
 - **🪝 ReactUse** - Collection of essential React hooks for modern development
-
-## 🎯 Why This Scaffold?
-
-- **🏎️ Fast Development** - Pre-configured tooling and best practices
-- **🎨 Beautiful UI** - Complete shadcn/ui component library with advanced interactions
-- **🔒 Type Safety** - Full TypeScript configuration with Zod validation
-- **📱 Responsive** - Mobile-first design principles with smooth animations
-- **🗄️ Database Ready** - Prisma ORM configured for rapid backend development
-- **🔐 Auth Included** - NextAuth.js for secure authentication flows
-- **📊 Data Visualization** - Charts, tables, and drag-and-drop functionality
-- **🌍 i18n Ready** - Multi-language support with Next Intl
-- **🚀 Production Ready** - Optimized build and deployment settings
-- **🤖 AI-Friendly** - Structured codebase perfect for AI assistance
 
 ## 🚀 Quick Start
 
@@ -94,7 +91,7 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 ### Demo Account
 
 For testing, you can use the demo account:
-- **Email:** demo@projectdecypher.com
+- **Email:** demo@runex.com
 - **Password:** demo123
 
 ## 🔐 Authentication
@@ -128,6 +125,7 @@ src/
 ├── lib/
 │   ├── auth.ts            # NextAuth configuration
 │   ├── db.ts              # Prisma client
+│   ├── ai-processor.ts    # AI processing service
 │   └── get-session.ts     # Server session helper
 └── types/
     └── next-auth.d.ts     # NextAuth type definitions
@@ -171,9 +169,13 @@ npm run db:reset
 - **🔐 User Authentication** - Secure sign up and login with NextAuth.js
 - **📤 File Upload** - Upload images of ancient manuscripts and inscriptions
 - **🤖 AI Processing** - Automated glyph recognition and tokenization
+- **🔍 Glyph Tokenisation** - Advanced segmentation of irregular glyphs
+- **🧠 Semantic Analysis** - Context-aware interpretation of ancient scripts
+- **🔧 Generative Reconstruction** - Restoration of damaged or incomplete glyphs
 - **📖 Translation** - Semantic translation with confidence scores
 - **📊 Dashboard** - User dashboard with statistics and activity
 - **📚 Translation Library** - Browse and search your translations
+- **📤 Export Capabilities** - Export in TEI-XML, JSON-LD formats
 - **🎨 Modern UI** - Beautiful, responsive interface with dark mode support
 
 ### Technical Features
@@ -184,6 +186,8 @@ npm run db:reset
 - **Database ORM** - Prisma for type-safe database access
 - **Responsive Design** - Mobile-first design with Tailwind CSS
 - **Component Library** - shadcn/ui for consistent UI components
+- **Metadata Tracking** - Provenance and version control
+- **Batch Processing** - Process multiple files simultaneously
 
 ## 🛠️ Development
 
@@ -197,6 +201,15 @@ NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key-here"
 ```
 
+**Optional AI Processing** (see [AI_SETUP.md](./AI_SETUP.md) for details):
+
+```env
+GOOGLE_GEMINI_API_KEY="your_gemini_api_key"  # Optional: Best accuracy
+HUGGINGFACE_API_KEY="your_hf_token"          # Optional: Higher rate limits
+```
+
+> **Note**: AI processing works out of the box with free services! No API keys required for basic usage. See [AI_SETUP.md](./AI_SETUP.md) for setup instructions.
+
 ### Building for Production
 
 ```bash
@@ -209,61 +222,22 @@ npm start
 
 The build output is optimized for standalone deployment.
 
-## 📁 Project Structure
+## 🎯 Supported Scripts
 
-```
-src/
-├── app/                 # Next.js App Router pages
-├── components/          # Reusable React components
-│   └── ui/             # shadcn/ui components
-├── hooks/              # Custom React hooks
-└── lib/                # Utility functions and configurations
-```
+Rune-X is designed to support multiple ancient scripts:
 
-## 🎨 Available Features & Components
-
-This scaffold includes a comprehensive set of modern web development tools:
-
-### 🧩 UI Components (shadcn/ui)
-- **Layout**: Card, Separator, Aspect Ratio, Resizable Panels
-- **Forms**: Input, Textarea, Select, Checkbox, Radio Group, Switch
-- **Feedback**: Alert, Toast (Sonner), Progress, Skeleton
-- **Navigation**: Breadcrumb, Menubar, Navigation Menu, Pagination
-- **Overlay**: Dialog, Sheet, Popover, Tooltip, Hover Card
-- **Data Display**: Badge, Avatar, Calendar
-
-### 📊 Advanced Data Features
-- **Tables**: Powerful data tables with sorting, filtering, pagination (TanStack Table)
-- **Charts**: Beautiful visualizations with Recharts
-- **Forms**: Type-safe forms with React Hook Form + Zod validation
-
-### 🎨 Interactive Features
-- **Animations**: Smooth micro-interactions with Framer Motion
-- **Drag & Drop**: Modern drag-and-drop functionality with DND Kit
-- **Theme Switching**: Built-in dark/light mode support
-
-### 🔐 Backend Integration
-- **Authentication**: Ready-to-use auth flows with NextAuth.js
-- **Database**: Type-safe database operations with Prisma
-- **API Client**: HTTP requests with Axios + TanStack Query
-- **State Management**: Simple and scalable with Zustand
-
-### 🌍 Production Features
-- **Internationalization**: Multi-language support with Next Intl
-- **Image Optimization**: Automatic image processing with Sharp
-- **Type Safety**: End-to-end TypeScript with Zod validation
-- **Essential Hooks**: 100+ useful React hooks with ReactUse for common patterns
-
-## 🤝 Get Started with Z.ai
-
-1. **Clone this scaffold** to jumpstart your project
-2. **Visit [chat.z.ai](https://chat.z.ai)** to access your AI coding assistant
-3. **Start building** with intelligent code generation and assistance
-4. **Deploy with confidence** using the production-ready setup
+- **Oracle Bone Script** (甲骨文) - Ancient Chinese inscriptions
+- **Bronze Script** (金文) - Bronze vessel inscriptions
+- **Seal Script** (篆书) - Ancient Chinese seal script
+- **Traditional Chinese** - Classical Chinese texts
+- **Classical Latin** - Ancient Roman inscriptions
+- **Ancient Greek** - Classical Greek texts
+- **Cuneiform** - Ancient Mesopotamian writing
+- **Hieroglyphs** - Egyptian hieroglyphic systems
 
 ## 📝 License
 
-This project is part of the Project Decypher initiative by Zhicong Technology.
+This project is part of the Rune-X initiative by Zhicong Technology.
 
 ## 🤝 Contributing
 
@@ -271,4 +245,4 @@ This is a project for ancient language decryption and cultural heritage preserva
 
 ---
 
-**Project Decypher** - Reviving lost languages through intelligent design 🚀
+**Rune-X** - Interpreting the past. Empowering the future. 🚀

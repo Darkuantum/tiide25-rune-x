@@ -66,8 +66,10 @@ export async function GET(request: NextRequest) {
         context: translation.context,
         createdAt: translation.createdAt.toISOString(),
         upload: {
+          id: upload.id,
           originalName: upload.originalName,
-          status: upload.status
+          status: upload.status,
+          imageUrl: `/api/uploads/${upload.id}`
         },
         glyphs: upload.glyphs.map(gm => ({
           symbol: gm.glyph.symbol,

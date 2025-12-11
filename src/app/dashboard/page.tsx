@@ -83,7 +83,7 @@ export default function DashboardPage() {
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2">
               <Brain className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold">Project Decypher</span>
+              <span className="text-lg font-semibold">Rune-X</span>
             </Link>
           </div>
           <div className="flex items-center space-x-2">
@@ -197,8 +197,8 @@ export default function DashboardPage() {
 
           {/* Quick Actions */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" asChild>
-              <Link href="/upload">
+            <Link href="/upload" className="block">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Upload className="h-5 w-5" />
@@ -214,11 +214,11 @@ export default function DashboardPage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
-              </Link>
-            </Card>
+              </Card>
+            </Link>
 
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" asChild>
-              <Link href="/translations">
+            <Link href="/translations" className="block">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
@@ -234,8 +234,8 @@ export default function DashboardPage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
-              </Link>
-            </Card>
+              </Card>
+            </Link>
           </div>
 
           {/* Recent Activity */}

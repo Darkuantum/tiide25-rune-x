@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,8 +35,10 @@ interface Translation {
   context?: string
   createdAt: string
   upload: {
+    id?: string
     originalName: string
     status: string
+    imageUrl?: string
   }
   glyphs?: Array<{
     symbol: string
@@ -51,6 +54,7 @@ export default function TranslationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTab, setSelectedTab] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     fetchTranslations()
@@ -92,62 +96,6 @@ export default function TranslationsPage() {
         // Fallback to empty array or mock data for development
         setTranslations([])
       }
-      
-      // Mock data fallback for development (only if no translations from API)
-      if (!data.success || !data.translations || data.translations.length === 0) {
-        const mockTranslations: Translation[] = [
-        {
-          id: '1',
-          originalText: '道法自然',
-          translatedText: 'The Tao follows nature - A fundamental concept in Taoist philosophy suggesting that the natural way of things is the best way.',
-          confidence: 0.92,
-          language: 'English',
-          context: 'Taoist philosophy, Laozi',
-          createdAt: new Date().toISOString(),
-          upload: {
-            originalName: 'taoist_text.jpg',
-            status: 'COMPLETED'
-          },
-          glyphs: [
-            { symbol: '道', confidence: 0.95, meaning: 'Tao - The way/path', script: 'Traditional Chinese' },
-            { symbol: '法', confidence: 0.88, meaning: 'Fa - Law/method', script: 'Traditional Chinese' },
-            { symbol: '自', confidence: 0.92, meaning: 'Zi - Self/natural', script: 'Traditional Chinese' },
-            { symbol: '然', confidence: 0.85, meaning: 'Ran - Thus/naturally', script: 'Traditional Chinese' }
-          ]
-        },
-        {
-          id: '2',
-          originalText: '天人合一',
-          translatedText: 'Heaven and humanity are one - The unity between the cosmos and human existence.',
-          confidence: 0.88,
-          language: 'English',
-          context: 'Chinese philosophy, harmony between human and nature',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          upload: {
-            originalName: 'philosophy_scroll.png',
-            status: 'COMPLETED'
-          }
-        },
-        {
-          id: '3',
-          originalText: '仁义礼智',
-          translatedText: 'Benevolence, righteousness, propriety, and wisdom - The four cardinal virtues in Confucianism.',
-          confidence: 0.90,
-          language: 'English',
-          context: 'Confucian philosophy, moral cultivation',
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-          upload: {
-            originalName: 'confucian_text.jpg',
-            status: 'COMPLETED'
-          }
-        }
-        ]
-        // Only use mock data if we got no real translations
-        if (!data.success || !data.translations || data.translations.length === 0) {
-          setTranslations(mockTranslations)
-        }
-      }
-      
       setLoading(false)
     } catch (error) {
       console.error('Failed to fetch translations:', error)
@@ -199,6 +147,36 @@ export default function TranslationsPage() {
                 <Eye className="mr-2 h-4 w-4" />
                 New Analysis
               </Link>
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={resetting}
+              onClick={async () => {
+                const confirm = window.confirm(
+                  'This will wipe the entire database (including users). Continue?'
+                )
+                if (!confirm) return
+                setResetting(true)
+                try {
+                  const resp = await fetch('/api/admin/reset', { method: 'POST' })
+                  if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}))
+                    throw new Error(data.error || 'Failed to reset database')
+                  }
+                  setTranslations([])
+                  setFilteredTranslations([])
+                  alert('Database reset successfully. You will be signed out.')
+                  await signOut({ callbackUrl: '/' })
+                } catch (err: any) {
+                  console.error(err)
+                  alert(err.message || 'Failed to reset database')
+                } finally {
+                  setResetting(false)
+                }
+              }}
+            >
+              {resetting ? 'Resetting...' : 'Reset DB'}
             </Button>
           </div>
         </div>
@@ -351,6 +329,33 @@ export default function TranslationsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
+                        {/* Original Image */}
+                        <div>
+                          <h4 className="font-medium mb-2">Original Image</h4>
+                          {translation.upload.imageUrl ? (
+                            <img
+                              src={translation.upload.imageUrl}
+                              alt={translation.upload.originalName || 'Uploaded image'}
+                              className="max-h-64 rounded border"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                                const parent = e.currentTarget.parentElement
+                                if (parent && !parent.querySelector('.image-placeholder')) {
+                                  const placeholder = document.createElement('div')
+                                  placeholder.className = 'image-placeholder bg-muted/50 p-6 rounded border text-center text-muted-foreground'
+                                  placeholder.innerHTML = '<p>Image not available</p>'
+                                  parent.appendChild(placeholder)
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="bg-muted/50 p-6 rounded border text-center text-muted-foreground">
+                              <p>Image not available</p>
+                              <p className="text-xs mt-2">The original file may have been deleted or moved</p>
+                            </div>
+                          )}
+                        </div>
+
                         {/* Translation */}
                         <div>
                           <h4 className="font-medium mb-2">Translation</h4>
