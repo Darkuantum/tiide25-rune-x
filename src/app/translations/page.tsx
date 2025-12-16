@@ -114,6 +114,21 @@ export default function TranslationsPage() {
     return 'destructive'
   }
 
+  // Match glyph confidence colouring with results page
+  const getGlyphConfidenceColor = (confidence: number) => {
+    if (confidence === 0) return 'text-red-600' // Unknown characters
+    if (confidence < 0.3) return 'text-red-500'
+    if (confidence < 0.7) return 'text-yellow-600'
+    return 'text-green-600'
+  }
+
+  const getGlyphConfidenceBgColor = (confidence: number) => {
+    if (confidence === 0) return 'bg-red-50 border-red-200' // Unknown characters
+    if (confidence < 0.3) return 'bg-red-50 border-red-200'
+    if (confidence < 0.7) return 'bg-yellow-50 border-yellow-200'
+    return 'bg-green-50 border-green-200'
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -375,15 +390,31 @@ export default function TranslationsPage() {
                           <div>
                             <h4 className="font-medium mb-3">Detected Glyphs</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              {translation.glyphs.map((glyph, index) => (
-                                <div key={index} className="text-center p-3 border rounded-lg bg-muted/30">
-                                  <div className="text-xl mb-1">{glyph.symbol}</div>
-                                  <div className="text-xs font-medium">{glyph.meaning}</div>
-                                  <div className="text-xs text-green-600">
-                                    {(glyph.confidence * 100).toFixed(1)}%
+                              {translation.glyphs.map((glyph, index) => {
+                                const confidence = glyph.confidence || 0
+                                const confidencePercent = confidence * 100
+
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`text-center p-4 border-2 rounded-lg ${getGlyphConfidenceBgColor(confidence)}`}
+                                  >
+                                    <div
+                                      className={`text-2xl mb-2 font-bold ${getGlyphConfidenceColor(confidence)}`}
+                                    >
+                                      {glyph.symbol}
+                                    </div>
+                                    <div className="text-sm font-medium mb-1 min-h-[2.5rem]">
+                                      {glyph.meaning || 'No meaning available'}
+                                    </div>
+                                    <div
+                                      className={`text-xs font-semibold ${getGlyphConfidenceColor(confidence)}`}
+                                    >
+                                      {confidencePercent.toFixed(1)}% match
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
                         )}

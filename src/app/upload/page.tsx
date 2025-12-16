@@ -61,6 +61,7 @@ export default function UploadPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState('upload')
   const [savedResults, setSavedResults] = useState<ProcessingResult[]>([]) // Results from database
+  const [isDragging, setIsDragging] = useState(false)
 
   // Load saved results from the database
   const loadSavedResults = useCallback(async () => {
@@ -145,16 +146,55 @@ export default function UploadPage() {
     return null
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (files: FileList | File[]) => {
+    const fileArray = Array.isArray(files) ? files : Array.from(files)
+    if (fileArray.length === 0) return
+
+    const newFiles = fileArray
+      .filter(file => file.type.startsWith('image/'))
+      .map(file => ({
+        file,
+        preview: URL.createObjectURL(file),
+        id: Math.random().toString(36).substr(2, 9)
+      }))
+    setUploadedFiles(prev => [...prev, ...newFiles])
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
+    handleFileUpload(files)
+  }
 
-    const newFiles = Array.from(files).map(file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      id: Math.random().toString(36).substr(2, 9)
-    }))
-    setUploadedFiles(prev => [...prev, ...newFiles])
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set dragging to false if we're leaving the drop zone itself
+    if (e.currentTarget === e.target) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      handleFileUpload(files)
+    }
   }
 
   const removeFile = (id: string) => {
@@ -466,9 +506,9 @@ export default function UploadPage() {
               ? {
                   ...r,
                   uploadId: uploadData.uploadId, // Store uploadId for exports
-                  status: 'completed',
+                  status: 'completed' as const,
                   progress: 100,
-                  currentStage: 'complete',
+                  currentStage: 'complete' as const,
                   imageUrl: `/api/uploads/${uploadData.uploadId}`, // Add image URL
                   glyphs: (() => {
                     // Try to get glyphs from resultsData first, then fallback to processData
@@ -522,9 +562,9 @@ export default function UploadPage() {
               : r
           )
           
-          // Switch to results tab when we have completed results
-          const hasCompleted = updated.some(r => r.status === 'completed')
-          if (hasCompleted) {
+          // Switch to results tab only when ALL files have completed or failed
+          const allFinished = updated.every(r => r.status === 'completed' || r.status === 'failed')
+          if (allFinished && updated.length > 0) {
             // Use setTimeout to ensure state is updated first
             setTimeout(() => {
               setActiveTab('results')
@@ -541,21 +581,30 @@ export default function UploadPage() {
       const errorMessage = error?.message || error?.toString() || 'An unexpected error occurred'
       
       // Only mark files that are still processing as failed
-      setProcessingResults(prev => 
-        prev.map(r => 
+      setProcessingResults(prev => {
+        const updated = prev.map(r => 
           r.status === 'processing'
             ? {
                 ...r,
-                status: 'failed',
+                status: 'failed' as const,
                 progress: 0,
                 error: errorMessage
               }
             : r
         )
-      )
+        
+        // Check if all files are now finished and navigate if so
+        const allFinished = updated.every(r => r.status === 'completed' || r.status === 'failed')
+        if (allFinished && updated.length > 0) {
+          setTimeout(() => {
+            setActiveTab('results')
+          }, 100)
+        }
+        
+        return updated
+      })
     } finally {
       setIsProcessing(false)
-      // Tab switching is now handled inside the state update
     }
   }
 
@@ -621,10 +670,20 @@ export default function UploadPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="border-2 border-dashed border-primary/20 rounded-lg p-8 text-center">
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                        isDragging
+                          ? 'border-primary bg-primary/5'
+                          : 'border-primary/20 hover:border-primary/40'
+                      }`}
+                      onDragEnter={handleDragEnter}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
                       <FileImage className="h-12 w-12 text-primary/40 mx-auto mb-4" />
                       <p className="text-lg font-medium mb-2">
-                        Click to upload images
+                        {isDragging ? 'Drop files here' : 'Click to upload images'}
                       </p>
                       <p className="text-sm text-muted-foreground mb-4">
                         Supports JPG, PNG, WebP, TIFF up to 10MB
@@ -633,7 +692,7 @@ export default function UploadPage() {
                         type="file"
                         multiple
                         accept="image/*"
-                        onChange={handleFileUpload}
+                        onChange={handleFileInputChange}
                         className="hidden"
                         id="file-upload"
                       />

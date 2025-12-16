@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { processAncientText } from '@/lib/ai-processor'
+import { processAncientText, generateTranslation } from '@/lib/ai-processor'
 import { batchReconstructGlyphs, needsReconstruction } from '@/lib/grm'
 import { join } from 'path'
 import { writeFile, mkdir } from 'fs/promises'
@@ -255,16 +255,17 @@ async function processUpload(
       glyphsProcessed++
     }
 
-    // Save translation
-    if (result.translation) {
+    // Generate and save translation
+    const translationResult = await generateTranslation(result.extractedText, result.glyphs)
+    if (translationResult.translation) {
       await db.translation.create({
         data: {
           uploadId: upload.id,
           originalText: result.extractedText,
-          translatedText: result.translation,
-          confidence: result.confidence,
+          translatedText: translationResult.translation,
+          confidence: translationResult.confidence,
           language: 'English'
-        })
+        }
       })
     }
 
@@ -275,7 +276,7 @@ async function processUpload(
         needsReconstruction({
           symbol: g.symbol,
           confidence: g.confidence,
-          boundingBox: g.position
+          boundingBox: g.boundingBox
         })
       )
 
@@ -283,7 +284,7 @@ async function processUpload(
         const reconstructionResults = await batchReconstructGlyphs(
           upload.filePath,
           candidates.map(g => ({
-            boundingBox: g.position,
+            boundingBox: g.boundingBox || { x: 0, y: 0, width: 50, height: 50 },
             symbol: g.symbol,
             confidence: g.confidence
           })),

@@ -68,7 +68,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create glyph records and matches
-    const createdGlyphMatches = []
+    const createdGlyphMatches: Array<{
+      id: string
+      uploadId: string
+      glyphId: string
+      confidence: number
+      boundingBox: string | null
+      position: number | null
+      glyph: any
+    }> = []
     for (const glyphMatch of processingResult.glyphs) {
       // Find or create glyph in database
       let glyphRecord = await db.glyph.findFirst({

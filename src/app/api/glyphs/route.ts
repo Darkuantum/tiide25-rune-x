@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import ZAI from 'z-ai-web-dev-sdk'
+// ZAI SDK is optional - only used when useAI flag is true
+// import ZAI from 'z-ai-web-dev-sdk'
 
 // Advanced glyph processing with AI simulation
 export async function POST(request: NextRequest) {
@@ -21,7 +22,18 @@ export async function POST(request: NextRequest) {
 
     if (useAI) {
       try {
-        // Use ZAI SDK for enhanced processing
+        // Use ZAI SDK for enhanced processing (requires z-ai-web-dev-sdk package)
+        // Dynamic import to avoid build errors if package is not installed
+        let ZAI: any
+        try {
+          // @ts-expect-error - z-ai-web-dev-sdk is optional and may not be installed
+          ZAI = (await import('z-ai-web-dev-sdk')).default
+        } catch (importError) {
+          return NextResponse.json(
+            { error: 'ZAI SDK not available. Please install z-ai-web-dev-sdk package.' },
+            { status: 503 }
+          )
+        }
         const zai = await ZAI.create()
         
         // Simulate AI analysis of ancient text

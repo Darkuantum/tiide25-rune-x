@@ -386,8 +386,8 @@ export default function Home() {
             <div className="relative">
               <div className="aspect-square rounded-2xl overflow-hidden shadow-md border bg-muted/30">
                 <img
-                  src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80"
-                  alt="Ancient manuscript imagery"
+                  src="https://unsplash.com/photos/f2J5zdtMN4o/download?force=true&w=1200"
+                  alt="Ancient inscriptions with visible characters and glyphs being interpreted by AI"
                   className="w-full h-full object-cover"
                 />
               </div>

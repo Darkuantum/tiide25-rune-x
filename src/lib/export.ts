@@ -10,8 +10,8 @@ interface ExportData {
     glyphs: (GlyphMatch & {
       glyph: {
         symbol: string
-        name?: string
-        description?: string
+        name: string | null
+        description: string | null
       }
     })[]
     translations: Translation[]
@@ -24,7 +24,9 @@ interface ExportData {
  * TEI (Text Encoding Initiative) XML is a standard format for scholarly text encoding
  */
 export function exportToTEI(data: ExportData): string {
-  const { upload, glyphs, translations } = data.upload
+  const upload = data.upload
+  const glyphs = upload.glyphs
+  const translations = upload.translations
   
   const teiHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <TEI xmlns="http://www.tei-c.org/ns/1.0">
@@ -83,7 +85,9 @@ export function exportToTEI(data: ExportData): string {
  * JSON-LD is a standard for linked data, useful for semantic web and digital humanities
  */
 export function exportToJSONLD(data: ExportData): string {
-  const { upload, glyphs, translations } = data.upload
+  const upload = data.upload
+  const glyphs = upload.glyphs
+  const translations = upload.translations
   
   const jsonLd = {
     '@context': {
@@ -139,7 +143,9 @@ export function exportToJSONLD(data: ExportData): string {
  * Export to CSV format
  */
 export function exportToCSV(data: ExportData): string {
-  const { upload, glyphs, translations } = data.upload
+  const upload = data.upload
+  const glyphs = upload.glyphs
+  const translations = upload.translations
   
   const rows: string[] = []
   

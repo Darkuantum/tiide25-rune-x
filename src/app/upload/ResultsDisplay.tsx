@@ -256,6 +256,16 @@ export default function ResultsDisplay({
                 </div>
               )}
 
+              {/* Translation */}
+              {result.translation && (
+                <div>
+                  <h4 className="font-medium mb-3">Translation & Context</h4>
+                  <div className="bg-primary/10 p-4 rounded-lg">
+                    <p className="font-medium mb-2">{result.translation}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Detected Glyphs */}
               <div>
                 <h4 className="font-medium mb-3">
@@ -316,16 +326,6 @@ export default function ResultsDisplay({
                   </div>
                 )}
               </div>
-
-              {/* Translation */}
-              {result.translation && (
-                <div>
-                  <h4 className="font-medium mb-3">Translation & Context</h4>
-                  <div className="bg-primary/10 p-4 rounded-lg">
-                    <p className="font-medium mb-2">{result.translation}</p>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         )

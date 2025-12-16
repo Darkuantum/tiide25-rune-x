@@ -905,7 +905,8 @@ export async function generateTranslation(
           }],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 300
+            // Allow longer responses so translations don't get cut off mid-sentence
+            maxOutputTokens: 800
           }
         })
         
